@@ -15,7 +15,7 @@ docker compose pull
 
 Then check that:
 
-1. `docker ps` shows the running container `pg-bigdata`.
+1. `docker ps` shows the running container `pg-bigdata` after do `docker compose up -d`.
 2. `python3 --version` works on your machine (on Windows use `python` or `py`
    instead of `python3` in all commands below).
 
@@ -124,6 +124,12 @@ LIMIT 10;
 
 > **Think about it:** does `LIMIT 10` make queries (a) and (b) cheaper?
 > Compare with and without it using `EXPLAIN ANALYZE`.
+> 
+> ANSWER: 
+> Query (a) costs 17189.60..17192.64 and (b) 18811.57..18938.78 using `LIMIT 10`.
+> If we don't use it, the costs are 17189.60..17215.44 and 20538.48..20540.98 respectively.
+> So there is not a lot of difference between (a) with limit and without, but with it is a bit better.
+> And in the case of (b), the costs are less similar and also the result with limit is better.
 
 ## Part 2 — Activities (graded)
 
@@ -147,18 +153,77 @@ Load the generated data into PostgreSQL in a **new table** called `orders`.
 Write the `CREATE TABLE` yourself (choose sensible types for each column) and
 use the same `\COPY` pattern as in section 3.3.
 
+ANSWER:
+```
+DROP TABLE IF EXISTS orders;
+
+CREATE TABLE orders (
+  id SERIAL PRIMARY KEY,
+  customer_name TEXT,
+  product_category TEXT,
+  quantity INTEGER,
+  price_per_unit FLOAT,
+  order_date DATE,
+  country TEXT
+);
+
+\COPY orders(customer_name, product_category, quantity, price_per_unit, order_date, country) FROM '/data/orders_1M.csv' DELIMITER ',' CSV HEADER;
+```
+
 Using SQL ([list of supported SQL commands](https://www.postgresql.org/docs/current/sql-commands.html)),
 answer the following questions:
 
 **A.** Which order has the highest `price_per_unit`?
+>841292 | Emma Brown    | Automotive       |        3 |           2000 | 2024-10-11 | Italy
+```
+SELECT *
+FROM orders
+ORDER BY price_per_unit DESC
+LIMIT 1;
+```
 
 **B.** What are the top 3 product categories with the highest total quantity
 sold across all orders?
+>Health & Beauty (300842), Electronics (300804) and Toys (300598)
+```
+SELECT product_category, SUM(quantity) AS sum_quantity
+FROM orders
+GROUP BY product_category
+ORDER BY sum_quantity DESC
+LIMIT 3;
+```
 
 **C.** What is the total revenue per product category?
 (Revenue = `price_per_unit × quantity`)
+> * Automotive       | 306589798.86000013
+> * Books            | 12731976.040000021
+> * Electronics      | 241525009.44999996
+> * Fashion          | 31566368.220000133
+> * Grocery          | 15268355.660000077
+> * Health & Beauty  |  46599817.89000009
+> * Home & Garden    |  78023780.09000018
+> * Office Supplies  |  38276061.63999993
+> * Sports           |  61848990.83000004
+> * Toys             | 23271039.020000055
+```
+SELECT product_category, SUM(price_per_unit * quantity) AS revenue
+FROM orders
+GROUP BY product_category;
+```
 
 **D.** Who are the top 5 customers by total spending?
+> * Carol Taylor   | 991179.1800000002
+> * Nina Lopez     |         975444.95
+> * Daniel Jackson | 959344.4800000002
+> * Carol Lewis    |         947708.57
+> * Daniel Young   | 946030.1400000001
+``` 
+SELECT customer_name, SUM(price_per_unit * quantity) AS total_spending
+FROM orders
+GROUP BY customer_name
+ORDER BY total_spending DESC
+LIMIT 5;
+```
 
 **E.** Look at the spending totals in D — and at how many orders each of those
 customers has. What do you notice? Open `ecommerce/dataset_generator.py` and

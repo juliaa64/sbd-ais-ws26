@@ -42,7 +42,7 @@ func main() {
 	r.Get("/api/menu", rest.GetMenu(db))
 	// Order Routes
 	r.Get("/api/order/all", rest.GetOrders(db))
-	r.Get("/api/order/totalled", rest.GetOrdersTotal(db))
+	r.Get("/api/order/total", rest.GetOrdersTotal(db))
 	r.Post("/api/order", rest.PostOrder(db))
 	// OpenAPI Routes
 	r.Get("/openapi/*", httpSwagger.WrapHandler)
