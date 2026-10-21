@@ -212,13 +212,14 @@ GROUP BY product_category;
 ```
 
 **D.** Who are the top 5 customers by total spending?
-> * Carol Taylor   | 991179.1800000002
-> * Nina Lopez     |         975444.95
-> * Daniel Jackson | 959344.4800000002
-> * Carol Lewis    |         947708.57
-> * Daniel Young   | 946030.1400000001
+> * **customer_name  |  total_spending   | count**
+> * Carol Taylor   | 991179.1800000002 |  1028
+> * Nina Lopez     | 975444.9499999998 |   980
+> * Daniel Jackson |         959344.48 |  1033
+> * Carol Lewis    | 947708.5700000001 |   943
+> * Daniel Young   | 946030.1400000001 |   973
 ``` 
-SELECT customer_name, SUM(price_per_unit * quantity) AS total_spending
+SELECT customer_name, SUM(price_per_unit * quantity) AS total_spending, COUNT(*)
 FROM orders
 GROUP BY customer_name
 ORDER BY total_spending DESC
@@ -228,6 +229,11 @@ LIMIT 5;
 **E.** Look at the spending totals in D — and at how many orders each of those
 customers has. What do you notice? Open `ecommerce/dataset_generator.py` and
 explain *why* the data looks like this.
+
+> All of them have similar numbers in total spending and also in how many orders 
+> they have. If we check `ecommerce/dataset_generator.py`, we can find that the
+> functions choose the data randomly (the costumer and the category). This means
+> that the results are going to be uniform and there are not going to be outliers.
 
 ### Activity 2.2 — Why Is This Self-Join So Slow?
 
@@ -259,16 +265,47 @@ Run the self-join (with `\timing on`) on each of the three tables and fill in:
 
 | rows in table | join result (`COUNT(*)`) | time |
 |---|---|---|
-| 50 000 | | |
-| 100 000 | | |
-| 200 000 | | |
+| 50 000 | 27501822| 3095.555 ms (00:03.096)|
+| 100 000 | 109946508| 14935.895 ms (00:14.936)|
+| 200 000 | 439395606| 80464.699 ms (01:20.465)|
+
+```sql
+SELECT COUNT(*)
+FROM people_50k p1
+JOIN people_50k p2
+  ON p1.country = p2.country;
+```
 
 When the input **doubles**, by what factor do the result and the time grow?
 Use this to **predict** the result size and the runtime on `people_big` (1M rows).
+> The query exhibits quadratic growth (O(N^2)). When the input size doubles 
+> (e.g., from 50k to 100k), the result size and the execution time grow by a 
+> factor of 4 (2^2).
+> 
+> Since 1 million is 5 times larger than 200,000, the result size and time will 
+> grow by a factor of 25 (5^2). If the 200k query takes around 1 minute and
+> 20 seconds (80464.699 ms), the 1M row query will take 25 * 80464.699 ms =
+> 2011617,475 ms (over 9 hours and a half).
 
 **Step 2 — Does an index help?** Create an index on `country` of `people_100k`,
 run `ANALYZE people_100k;`, and repeat the query. Did the time change? Use
 `EXPLAIN ANALYZE` to support your answer. Why does (or doesn't) the index help?
+
+```sql
+CREATE INDEX index_people_100k_country ON people_100k (country);
+ANALYZE people_100k;
+        
+EXPLAIN ANALYZE
+SELECT COUNT(*)
+FROM people_100k p1
+JOIN people_100k p2
+ON p1.country = p2.country;
+```
+> The execution time was 26434.683 ms. 
+> 
+> No, an index on country does not significantly improve the execution time. 
+> `EXPLAIN ANALYZE` will show that the database still has to perform a massive 
+> join operation (the execution time was longer).
 
 **Step 3 — Rewrite it.** The query only wants the *number* of matching pairs,
 not the pairs themselves. If a country has *k* people, how many pairs does it
@@ -276,6 +313,20 @@ contribute to the join? Write a query that computes the **same number
 without a join**. Check that it returns exactly the same result as the join on
 `people_100k`, then run it on `people_big` and compare its runtime with your
 prediction from Step 1.
+> If a country has k people, the self-join creates k pairs of each person of 
+> this country (k*k). So we can calculate the same if we calculate the k^2 of
+> each country.
+
+```sql
+SELECT SUM(k * k)
+FROM (
+    SELECT COUNT(*) AS k
+    FROM people_100k
+    GROUP BY country
+);
+```
+> It returns 109946508, the same number as the self-join. If we run it on
+> people_big, we obtain 10983941260 and a runtime of 178.722 ms. 
 
 **Step 4 — Discussion (submit in writing).** Considering **scalability** and
 **efficiency**, which approaches and/or optimizations can be applied to improve
@@ -287,6 +338,20 @@ this kind of query in a real system? Discuss at least:
   much?
 - the limits of an **OLTP database** for this workload, especially in a
   **large-scale cloud environment**.
+
+> * The rewrite in Step 3 demonstrates that fixing algorithmic complexity 
+> (moving from O(N^2) to O(N)) is more effective than scaling hardware or 
+> adding indexes.
+> 
+> * If the pairs themselves is required, a single database node will struggle 
+> with memory. Adding a bigger machine (vertical scaling) helps slightly by 
+> providing more RAM and being faster.
+> 
+> * OLTP databases (like PostgreSQL) are built for quick, small tasks. 
+> They are not meant to do heavy math on millions of rows at once. If you run 
+> a massive query (like the self-join) on an OLTP, it will use up all the 
+> server's power (CPU and memory). This will freeze the database and lock 
+> out normal users trying to use your app. 
 
 > **Optional:** support your answer with a diagram, SQL or code.
 
