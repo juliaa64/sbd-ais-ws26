@@ -99,3 +99,6 @@ fabric.properties
 
 # Go workspace file
 go.work
+
+# Link to the github repository
+link_github.txt
