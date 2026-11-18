@@ -379,8 +379,8 @@ the key of an event?
 > **Prediction**: all three velocity instances share the work and R4 passes, because three instances can handle 1,000 
 > payments/s.
 > 
-> ![img.png](run1.png)
-> ![img.png](run1_1.png)
+> ![img.png](assets/run1.png)
+> ![img.png](assets/run1_1.png)
 > 
 > **Why**: Debezium created the topic with 1 partition, and within a consumer group one partition is read by only one 
 > instance. Only vel-1 got assigned partitions [0] (~500 payments/s at most), vel-2 and vel-3 stayed idle, so the 
@@ -450,8 +450,8 @@ partitions [0, 1]`, `[vel-2] … [2, 3]`, `[vel-3] … [4, 5]`.
 > 
 > **Prediction**: now all three instances work, so R3 and R4 pass.
 > 
-> ![img.png](run2.png)
-> ![img_1.png](run2_1.png)
+> ![img.png](assets/run2.png)
+> ![img_1.png](assets/run2_1.png)
 > 
 > **Why**: each instance now has 2 partitions and keeps up (R4 passes), but the key is still Debezium's default, the primary key {"id": ...}. The 12 test payments of one stolen card are hashed to random partitions and spread over the three instances, each counts only ~4 (< threshold 8), so almost no fraud is caught and R3 fails. The anomaly model passes only because it has a single instance that reads all partitions.
 
@@ -496,8 +496,8 @@ routine, from step 1**, as in Run 2.
 > **Prediction**: the key becomes {"user_id": ...}, all payments of a cardholder go 
 > to the same partition and instance, so R3 and R4 pass.
 > 
-> ![img.png](run3.png)
-> ![img_1.png](run3_1.png)
+> ![img.png](assets/run3.png)
+> ![img_1.png](assets/run3_1.png)
 > 
 > **Why**: with user_id as key, all payments of a cardholder land in one partition,
 > are read in commit order by one instance, which therefore sees the whole attack 
